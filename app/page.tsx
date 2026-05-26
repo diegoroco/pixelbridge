@@ -6,6 +6,7 @@ import CopyButton from '@/components/CopyButton'
 
 interface FormData {
   pixelId: string
+  token: string
   stripeLink: string
   productName: string
   productPrice: string
@@ -16,6 +17,7 @@ interface FormData {
 
 const defaultForm: FormData = {
   pixelId: '',
+  token: '',
   stripeLink: '',
   productName: '',
   productPrice: '',
@@ -41,6 +43,7 @@ export default function Home() {
   function generate() {
     const config: BridgeConfig = {
       p: form.pixelId.trim(),
+      k: form.token.trim(),
       s: form.stripeLink.trim(),
       n: form.productName.trim(),
       v: form.productPrice.trim(),
@@ -145,6 +148,38 @@ export default function Home() {
                       className={inputClass}
                     />
                   </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Token de API de Conversiones
+                      </label>
+                      <span className="text-xs text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full font-medium">
+                        Recomendado
+                      </span>
+                    </div>
+                    <input
+                      type="password"
+                      value={form.token}
+                      onChange={e => update('token', e.target.value)}
+                      placeholder="EAAxxxxx..."
+                      className={inputClass}
+                    />
+                    <p className="text-xs text-gray-400 mt-1.5">
+                      Events Manager → tu Pixel → Configuración → API de Conversiones → Generar token
+                    </p>
+                  </div>
+
+                  {form.token && (
+                    <div className="flex items-start gap-2 bg-violet-50 rounded-lg p-3">
+                      <span className="text-violet-500 text-sm mt-0.5">✓</span>
+                      <p className="text-xs text-violet-700">
+                        Con el token activado, las conversiones se registran desde el servidor.
+                        Más preciso y no lo bloquean los ad blockers.
+                      </p>
+                    </div>
+                  )}
+
                   <button
                     onClick={() => setStep(2)}
                     disabled={!form.pixelId.trim()}

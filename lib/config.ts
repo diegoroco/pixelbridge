@@ -1,5 +1,6 @@
 export interface BridgeConfig {
   p: string  // pixelId
+  k: string  // conversions api token
   s: string  // stripeLink
   n: string  // productName
   v: string  // value/price

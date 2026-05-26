@@ -2,37 +2,55 @@
 
 import { useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { decodeConfig } from '@/lib/config'
+import { decodeConfig, BridgeConfig } from '@/lib/config'
 import { initPixel, track } from '@/lib/pixel'
+
+function getCookie(name: string): string | undefined {
+  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'))
+  return match ? match[2] : undefined
+}
+
+async function sendServerEvent(config: BridgeConfig, event: string, eventId: string) {
+  if (!config.k) return
+  try {
+    await fetch('/api/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pixelId: config.p,
+        token: config.k,
+        event,
+        eventId,
+        fbp: getCookie('_fbp'),
+        fbc: getCookie('_fbc') || new URLSearchParams(window.location.search).get('fbclid') || undefined,
+      }),
+    })
+  } catch {
+    // silent fail — browser pixel is the fallback
+  }
+}
 
 function GoContent() {
   const params = useSearchParams()
 
   useEffect(() => {
     const encoded = params.get('c')
-    if (!encoded) {
-      window.location.href = '/'
-      return
-    }
+    if (!encoded) { window.location.href = '/'; return }
 
     const config = decodeConfig(encoded)
-    if (!config?.s) {
-      window.location.href = '/'
-      return
-    }
+    if (!config?.s) { window.location.href = '/'; return }
+
+    const eventId = crypto.randomUUID()
 
     if (config.p) {
       initPixel(config.p)
       setTimeout(() => {
-        track('InitiateCheckout')
-        setTimeout(() => {
-          window.location.href = config.s
-        }, 300)
+        track('InitiateCheckout', undefined, eventId)
+        sendServerEvent(config, 'InitiateCheckout', eventId)
+        setTimeout(() => { window.location.href = config.s }, 400)
       }, 200)
     } else {
-      setTimeout(() => {
-        window.location.href = config.s
-      }, 200)
+      setTimeout(() => { window.location.href = config.s }, 200)
     }
   }, [params])
 

@@ -33,11 +33,12 @@ export function initPixel(pixelId: string): void {
   window.fbq('track', 'PageView')
 }
 
-export function track(event: string, params?: Record<string, unknown>): void {
+export function track(event: string, params?: Record<string, unknown>, eventId?: string): void {
   if (typeof window === 'undefined' || !window.fbq) return
+  const options = eventId ? { eventID: eventId } : undefined
   if (params) {
-    window.fbq('track', event, params)
+    window.fbq('track', event, params, options)
   } else {
-    window.fbq('track', event)
+    window.fbq('track', event, {}, options)
   }
 }
