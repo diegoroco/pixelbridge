@@ -10,8 +10,23 @@ function getCookie(name: string): string | undefined {
   return match ? match[2] : undefined
 }
 
+function getConfigFromEnv(): BridgeConfig | null {
+  const pixelId = process.env.NEXT_PUBLIC_PIXEL_ID
+  const stripeLink = process.env.NEXT_PUBLIC_STRIPE_LINK
+  if (!pixelId || !stripeLink) return null
+  return {
+    p: pixelId,
+    k: '',
+    s: stripeLink,
+    n: process.env.NEXT_PUBLIC_PRODUCT_NAME || '',
+    v: process.env.NEXT_PUBLIC_PRODUCT_PRICE || '0',
+    c: process.env.NEXT_PUBLIC_CURRENCY || 'EUR',
+    t: process.env.NEXT_PUBLIC_SUCCESS_TITLE || '¡Gracias por tu compra!',
+    m: process.env.NEXT_PUBLIC_SUCCESS_MESSAGE || '',
+  }
+}
+
 async function sendServerEvent(config: BridgeConfig, event: string, eventId: string) {
-  if (!config.k) return
   try {
     await fetch('/api/track', {
       method: 'POST',
@@ -26,7 +41,7 @@ async function sendServerEvent(config: BridgeConfig, event: string, eventId: str
       }),
     })
   } catch {
-    // silent fail — browser pixel is the fallback
+    // silent fail
   }
 }
 
@@ -34,10 +49,12 @@ function GoContent() {
   const params = useSearchParams()
 
   useEffect(() => {
-    const encoded = params.get('c')
-    if (!encoded) { window.location.href = '/'; return }
+    const config = getConfigFromEnv() || (() => {
+      const encoded = params.get('c')
+      if (!encoded) return null
+      return decodeConfig(encoded)
+    })()
 
-    const config = decodeConfig(encoded)
     if (!config?.s) { window.location.href = '/'; return }
 
     const eventId = crypto.randomUUID()

@@ -16,7 +16,8 @@ export async function POST(request: NextRequest) {
     const body: TrackBody = await request.json()
     const { pixelId, token, event, eventId, value, currency, fbp, fbc } = body
 
-    if (!pixelId || !token || !event) {
+    const resolvedToken = token || process.env.META_TOKEN
+    if (!pixelId || !resolvedToken || !event) {
       return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
     }
 
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           data: [eventPayload],
-          access_token: token,
+          access_token: resolvedToken,
         }),
       }
     )

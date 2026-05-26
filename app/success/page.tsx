@@ -10,8 +10,23 @@ function getCookie(name: string): string | undefined {
   return match ? match[2] : undefined
 }
 
+function getConfigFromEnv(): BridgeConfig | null {
+  const pixelId = process.env.NEXT_PUBLIC_PIXEL_ID
+  const stripeLink = process.env.NEXT_PUBLIC_STRIPE_LINK
+  if (!pixelId || !stripeLink) return null
+  return {
+    p: pixelId,
+    k: '',
+    s: stripeLink,
+    n: process.env.NEXT_PUBLIC_PRODUCT_NAME || '',
+    v: process.env.NEXT_PUBLIC_PRODUCT_PRICE || '0',
+    c: process.env.NEXT_PUBLIC_CURRENCY || 'EUR',
+    t: process.env.NEXT_PUBLIC_SUCCESS_TITLE || '¡Gracias por tu compra!',
+    m: process.env.NEXT_PUBLIC_SUCCESS_MESSAGE || '',
+  }
+}
+
 async function sendServerEvent(config: BridgeConfig, eventId: string) {
-  if (!config.k) return
   try {
     await fetch('/api/track', {
       method: 'POST',
@@ -38,21 +53,23 @@ function SuccessContent() {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    const encoded = params.get('c')
-    if (!encoded) { setReady(true); return }
+    const resolved = getConfigFromEnv() || (() => {
+      const encoded = params.get('c')
+      if (!encoded) return null
+      return decodeConfig(encoded)
+    })()
 
-    const decoded = decodeConfig(encoded)
-    setConfig(decoded)
+    setConfig(resolved)
 
-    if (decoded?.p) {
+    if (resolved?.p) {
       const eventId = crypto.randomUUID()
-      initPixel(decoded.p)
+      initPixel(resolved.p)
       setTimeout(() => {
         track('Purchase', {
-          value: parseFloat(decoded.v) || 0,
-          currency: decoded.c || 'EUR',
+          value: parseFloat(resolved.v) || 0,
+          currency: resolved.c || 'EUR',
         }, eventId)
-        sendServerEvent(decoded, eventId)
+        sendServerEvent(resolved, eventId)
       }, 300)
     }
 
@@ -79,30 +96,19 @@ function SuccessContent() {
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-white flex items-center justify-center px-4">
       <div className="max-w-md w-full text-center">
         <div className="w-24 h-24 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
-          <svg
-            className="w-12 h-12 text-emerald-500"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2.5}
-          >
+          <svg className="w-12 h-12 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
           </svg>
         </div>
-
         <h1 className="text-3xl font-bold text-gray-900 mb-3">
           {config?.t || '¡Gracias por tu compra!'}
         </h1>
-
         <p className="text-gray-500 text-base leading-relaxed">
           {config?.m || 'Tu pedido ha sido procesado correctamente.'}
         </p>
-
         {(config?.n || price) && (
           <div className="mt-8 bg-white rounded-2xl border border-gray-200 px-6 py-5 inline-block shadow-sm">
-            {config?.n && (
-              <p className="font-semibold text-gray-900 text-lg">{config.n}</p>
-            )}
+            {config?.n && <p className="font-semibold text-gray-900 text-lg">{config.n}</p>}
             {price && <p className="text-gray-500 text-sm mt-1">{price}</p>}
           </div>
         )}
