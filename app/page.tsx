@@ -32,7 +32,7 @@ export default function Home() {
   const [links, setLinks] = useState<{ go: string; success: string } | null>(null)
   const [origin, setOrigin] = useState('')
   const [testCode, setTestCode] = useState('')
-  const [testEvent, setTestEvent] = useState('Purchase')
+  const [testLink, setTestLink] = useState<'go' | 'success'>('go')
   const [testStatus, setTestStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle')
   const [testMessage, setTestMessage] = useState('')
 
@@ -43,6 +43,7 @@ export default function Home() {
   async function sendTest() {
     setTestStatus('loading')
     setTestMessage('')
+    const event = testLink === 'go' ? 'InitiateCheckout' : 'Purchase'
     try {
       const res = await fetch('/api/track', {
         method: 'POST',
@@ -50,7 +51,7 @@ export default function Home() {
         body: JSON.stringify({
           pixelId: '',
           token: '',
-          event: testEvent,
+          event,
           eventId: crypto.randomUUID(),
           testEventCode: testCode.trim(),
           value: 33,
@@ -60,7 +61,7 @@ export default function Home() {
       const data = await res.json()
       if (data.events_received > 0 || data.fbtrace_id) {
         setTestStatus('ok')
-        setTestMessage('Evento enviado correctamente. Revisa Meta Events Manager → Eventos de prueba.')
+        setTestMessage(`Evento "${event}" enviado. Revisa Meta Events Manager → Eventos de prueba.`)
       } else {
         setTestStatus('error')
         setTestMessage(data.error?.message || JSON.stringify(data))
@@ -86,10 +87,11 @@ export default function Home() {
       t: form.successTitle.trim(),
       m: form.successMessage.trim(),
     }
-    const encoded = encodeConfig(config)
+        // Encode kept for reference but short links are used
+    encodeConfig(config)
     setLinks({
-      go: `${origin}/go?c=${encoded}`,
-      success: `${origin}/success?c=${encoded}`,
+      go: `${origin}/go`,
+      success: `${origin}/success`,
     })
     setStep(4)
   }
@@ -482,7 +484,37 @@ export default function Home() {
           <div className="p-5 space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Código de prueba
+                ¿Qué link quieres verificar?
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { id: 'go', label: '🔗 Link de Checkout', sub: 'Dispara InitiateCheckout' },
+                  { id: 'success', label: '🎯 Link de Éxito', sub: 'Dispara Purchase' },
+                ] as const).map(opt => (
+                  <button
+                    key={opt.id}
+                    onClick={() => setTestLink(opt.id)}
+                    className={`text-left px-4 py-3 rounded-lg border transition-all ${
+                      testLink === opt.id
+                        ? 'border-violet-500 bg-violet-50 text-violet-700'
+                        : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300'
+                    }`}
+                  >
+                    <p className="text-sm font-medium">{opt.label}</p>
+                    <p className="text-xs mt-0.5 opacity-70">{opt.sub}</p>
+                  </button>
+                ))}
+              </div>
+              <div className="mt-2 flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-200">
+                <p className="text-xs text-gray-400 font-mono truncate flex-1">
+                  {origin || 'https://pixelbridge-theta.vercel.app'}/{testLink}
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Código de verificación de Meta
               </label>
               <input
                 type="text"
@@ -492,22 +524,8 @@ export default function Home() {
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm"
               />
               <p className="text-xs text-gray-400 mt-1.5">
-                Encuéntralo en Events Manager → tu Pixel → Eventos de prueba → Código del evento de prueba
+                Events Manager → tu Pixel → Eventos de prueba → "Código del evento de prueba"
               </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Tipo de evento
-              </label>
-              <select
-                value={testEvent}
-                onChange={e => setTestEvent(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm bg-white"
-              >
-                <option value="Purchase">Purchase (Compra)</option>
-                <option value="InitiateCheckout">InitiateCheckout (Inicio de pago)</option>
-              </select>
             </div>
 
             <button
