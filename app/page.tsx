@@ -49,13 +49,13 @@ export default function Home() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          pixelId: '',
-          token: '',
+          pixelId: form.pixelId.trim(),
+          token: form.token.trim(),
           event,
           eventId: crypto.randomUUID(),
           testEventCode: testCode.trim(),
-          value: 33,
-          currency: 'EUR',
+          value: parseFloat(form.productPrice) || 0,
+          currency: form.currency,
         }),
       })
       const data = await res.json()
@@ -460,6 +460,94 @@ export default function Home() {
               </ol>
             </div>
 
+            {/* Test section — only shown after generating links */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="bg-gray-50 px-5 py-4 border-b border-gray-100">
+                <div className="flex items-start gap-3">
+                  <span className="text-xl mt-0.5">🧪</span>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 text-sm">Verificar conexión con Meta</h3>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Envía un evento de prueba con tu pixel y token para confirmar que funciona
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="p-5 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    ¿Qué link quieres verificar?
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {([
+                      { id: 'go', label: '🔗 Link de Checkout', sub: 'InitiateCheckout' },
+                      { id: 'success', label: '🎯 Link de Éxito', sub: 'Purchase' },
+                    ] as const).map(opt => (
+                      <button
+                        key={opt.id}
+                        onClick={() => { setTestLink(opt.id); setTestStatus('idle') }}
+                        className={`text-left px-4 py-3 rounded-lg border transition-all ${
+                          testLink === opt.id
+                            ? 'border-violet-500 bg-violet-50 text-violet-700'
+                            : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300'
+                        }`}
+                      >
+                        <p className="text-sm font-medium">{opt.label}</p>
+                        <p className="text-xs mt-0.5 opacity-70">Evento: {opt.sub}</p>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mt-2 flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-200">
+                    <p className="text-xs text-gray-400 font-mono truncate flex-1">
+                      {links?.go.replace('/go', '') || origin}/{testLink}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Código de verificación de Meta
+                  </label>
+                  <input
+                    type="text"
+                    value={testCode}
+                    onChange={e => { setTestCode(e.target.value); setTestStatus('idle') }}
+                    placeholder="TEST12345"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm"
+                  />
+                  <p className="text-xs text-gray-400 mt-1.5">
+                    Events Manager → tu Pixel → Eventos de prueba → "Código del evento de prueba"
+                  </p>
+                </div>
+
+                <button
+                  onClick={sendTest}
+                  disabled={!testCode.trim() || testStatus === 'loading'}
+                  className="w-full bg-gray-800 hover:bg-gray-900 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white py-3 rounded-lg font-medium transition-colors text-sm flex items-center justify-center gap-2"
+                >
+                  {testStatus === 'loading' ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Enviando...
+                    </>
+                  ) : 'Enviar evento de prueba'}
+                </button>
+
+                {testStatus === 'ok' && (
+                  <div className="flex items-start gap-2 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                    <span className="text-emerald-500 font-bold text-sm">✓</span>
+                    <p className="text-sm text-emerald-700">{testMessage}</p>
+                  </div>
+                )}
+                {testStatus === 'error' && (
+                  <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-3">
+                    <span className="text-red-500 font-bold text-sm">✕</span>
+                    <p className="text-sm text-red-700">{testMessage}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
             <button
               onClick={reset}
               className="w-full border border-gray-300 text-gray-600 py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors text-sm"
@@ -468,96 +556,6 @@ export default function Home() {
             </button>
           </div>
         )}
-        {/* Test section — always visible */}
-        <div className="mt-10 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="bg-gray-50 px-5 py-4 border-b border-gray-100">
-            <div className="flex items-start gap-3">
-              <span className="text-xl mt-0.5">🧪</span>
-              <div>
-                <h3 className="font-semibold text-gray-900 text-sm">Verificar conexión con Meta</h3>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  Envía un evento de prueba para confirmar que la API de Conversiones funciona
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="p-5 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                ¿Qué link quieres verificar?
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {([
-                  { id: 'go', label: '🔗 Link de Checkout', sub: 'Dispara InitiateCheckout' },
-                  { id: 'success', label: '🎯 Link de Éxito', sub: 'Dispara Purchase' },
-                ] as const).map(opt => (
-                  <button
-                    key={opt.id}
-                    onClick={() => setTestLink(opt.id)}
-                    className={`text-left px-4 py-3 rounded-lg border transition-all ${
-                      testLink === opt.id
-                        ? 'border-violet-500 bg-violet-50 text-violet-700'
-                        : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300'
-                    }`}
-                  >
-                    <p className="text-sm font-medium">{opt.label}</p>
-                    <p className="text-xs mt-0.5 opacity-70">{opt.sub}</p>
-                  </button>
-                ))}
-              </div>
-              <div className="mt-2 flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-200">
-                <p className="text-xs text-gray-400 font-mono truncate flex-1">
-                  {origin || 'https://pixelbridge-theta.vercel.app'}/{testLink}
-                </p>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Código de verificación de Meta
-              </label>
-              <input
-                type="text"
-                value={testCode}
-                onChange={e => setTestCode(e.target.value)}
-                placeholder="TEST12345"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm"
-              />
-              <p className="text-xs text-gray-400 mt-1.5">
-                Events Manager → tu Pixel → Eventos de prueba → "Código del evento de prueba"
-              </p>
-            </div>
-
-            <button
-              onClick={sendTest}
-              disabled={!testCode.trim() || testStatus === 'loading'}
-              className="w-full bg-gray-800 hover:bg-gray-900 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white py-3 rounded-lg font-medium transition-colors text-sm flex items-center justify-center gap-2"
-            >
-              {testStatus === 'loading' ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Enviando...
-                </>
-              ) : (
-                'Enviar evento de prueba'
-              )}
-            </button>
-
-            {testStatus === 'ok' && (
-              <div className="flex items-start gap-2 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
-                <span className="text-emerald-500 font-bold text-sm">✓</span>
-                <p className="text-sm text-emerald-700">{testMessage}</p>
-              </div>
-            )}
-
-            {testStatus === 'error' && (
-              <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-3">
-                <span className="text-red-500 font-bold text-sm">✕</span>
-                <p className="text-sm text-red-700">{testMessage}</p>
-              </div>
-            )}
-          </div>
-        </div>
       </main>
 
       <footer className="text-center py-8 text-xs text-gray-400">
