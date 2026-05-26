@@ -5,6 +5,7 @@ interface TrackBody {
   token: string
   event: string
   eventId: string
+  testEventCode?: string
   value?: number
   currency?: string
   fbp?: string
@@ -14,10 +15,11 @@ interface TrackBody {
 export async function POST(request: NextRequest) {
   try {
     const body: TrackBody = await request.json()
-    const { pixelId, token, event, eventId, value, currency, fbp, fbc } = body
+    const { pixelId, token, event, eventId, testEventCode, value, currency, fbp, fbc } = body
 
     const resolvedToken = token || process.env.META_TOKEN
-    if (!pixelId || !resolvedToken || !event) {
+    const resolvedPixelId = pixelId || process.env.NEXT_PUBLIC_PIXEL_ID
+    if (!resolvedPixelId || !resolvedToken || !event) {
       return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
     }
 
@@ -41,19 +43,22 @@ export async function POST(request: NextRequest) {
       user_data: userData,
     }
 
-    if (event === 'Purchase' && value !== undefined) {
+    if ((event === 'Purchase' || testEventCode) && value !== undefined) {
       eventPayload.custom_data = { value, currency: currency || 'EUR' }
     }
 
+    const requestBody: Record<string, unknown> = {
+      data: [eventPayload],
+      access_token: resolvedToken,
+    }
+    if (testEventCode) requestBody.test_event_code = testEventCode
+
     const res = await fetch(
-      `https://graph.facebook.com/v19.0/${pixelId}/events`,
+      `https://graph.facebook.com/v19.0/${resolvedPixelId}/events`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          data: [eventPayload],
-          access_token: resolvedToken,
-        }),
+        body: JSON.stringify(requestBody),
       }
     )
 

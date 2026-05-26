@@ -31,10 +31,45 @@ export default function Home() {
   const [form, setForm] = useState<FormData>(defaultForm)
   const [links, setLinks] = useState<{ go: string; success: string } | null>(null)
   const [origin, setOrigin] = useState('')
+  const [testCode, setTestCode] = useState('')
+  const [testEvent, setTestEvent] = useState('Purchase')
+  const [testStatus, setTestStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle')
+  const [testMessage, setTestMessage] = useState('')
 
   useEffect(() => {
     setOrigin(window.location.origin)
   }, [])
+
+  async function sendTest() {
+    setTestStatus('loading')
+    setTestMessage('')
+    try {
+      const res = await fetch('/api/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pixelId: '',
+          token: '',
+          event: testEvent,
+          eventId: crypto.randomUUID(),
+          testEventCode: testCode.trim(),
+          value: 33,
+          currency: 'EUR',
+        }),
+      })
+      const data = await res.json()
+      if (data.events_received > 0 || data.fbtrace_id) {
+        setTestStatus('ok')
+        setTestMessage('Evento enviado correctamente. Revisa Meta Events Manager → Eventos de prueba.')
+      } else {
+        setTestStatus('error')
+        setTestMessage(data.error?.message || JSON.stringify(data))
+      }
+    } catch {
+      setTestStatus('error')
+      setTestMessage('Error de conexión')
+    }
+  }
 
   function update(key: keyof FormData, value: string) {
     setForm(prev => ({ ...prev, [key]: value }))
@@ -431,6 +466,80 @@ export default function Home() {
             </button>
           </div>
         )}
+        {/* Test section — always visible */}
+        <div className="mt-10 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="bg-gray-50 px-5 py-4 border-b border-gray-100">
+            <div className="flex items-start gap-3">
+              <span className="text-xl mt-0.5">🧪</span>
+              <div>
+                <h3 className="font-semibold text-gray-900 text-sm">Verificar conexión con Meta</h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Envía un evento de prueba para confirmar que la API de Conversiones funciona
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="p-5 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Código de prueba
+              </label>
+              <input
+                type="text"
+                value={testCode}
+                onChange={e => setTestCode(e.target.value)}
+                placeholder="TEST12345"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm"
+              />
+              <p className="text-xs text-gray-400 mt-1.5">
+                Encuéntralo en Events Manager → tu Pixel → Eventos de prueba → Código del evento de prueba
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Tipo de evento
+              </label>
+              <select
+                value={testEvent}
+                onChange={e => setTestEvent(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm bg-white"
+              >
+                <option value="Purchase">Purchase (Compra)</option>
+                <option value="InitiateCheckout">InitiateCheckout (Inicio de pago)</option>
+              </select>
+            </div>
+
+            <button
+              onClick={sendTest}
+              disabled={!testCode.trim() || testStatus === 'loading'}
+              className="w-full bg-gray-800 hover:bg-gray-900 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white py-3 rounded-lg font-medium transition-colors text-sm flex items-center justify-center gap-2"
+            >
+              {testStatus === 'loading' ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Enviando...
+                </>
+              ) : (
+                'Enviar evento de prueba'
+              )}
+            </button>
+
+            {testStatus === 'ok' && (
+              <div className="flex items-start gap-2 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                <span className="text-emerald-500 font-bold text-sm">✓</span>
+                <p className="text-sm text-emerald-700">{testMessage}</p>
+              </div>
+            )}
+
+            {testStatus === 'error' && (
+              <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-3">
+                <span className="text-red-500 font-bold text-sm">✕</span>
+                <p className="text-sm text-red-700">{testMessage}</p>
+              </div>
+            )}
+          </div>
+        </div>
       </main>
 
       <footer className="text-center py-8 text-xs text-gray-400">
