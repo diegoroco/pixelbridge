@@ -49,11 +49,9 @@ function GoContent() {
   const params = useSearchParams()
 
   useEffect(() => {
-    const config = getConfigFromEnv() || (() => {
-      const encoded = params.get('c')
-      if (!encoded) return null
-      return decodeConfig(encoded)
-    })()
+    // Un link generado (?c=...) tiene prioridad sobre el producto por defecto de las variables de entorno
+    const encoded = params.get('c')
+    const config = (encoded && decodeConfig(encoded)) || getConfigFromEnv()
 
     if (!config?.s) { window.location.href = '/'; return }
 

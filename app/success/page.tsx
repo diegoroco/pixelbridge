@@ -53,11 +53,9 @@ function SuccessContent() {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    const resolved = getConfigFromEnv() || (() => {
-      const encoded = params.get('c')
-      if (!encoded) return null
-      return decodeConfig(encoded)
-    })()
+    // Un link generado (?c=...) tiene prioridad sobre el producto por defecto de las variables de entorno
+    const encoded = params.get('c')
+    const resolved = (encoded && decodeConfig(encoded)) || getConfigFromEnv()
 
     setConfig(resolved)
 

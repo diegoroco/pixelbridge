@@ -87,11 +87,11 @@ export default function Home() {
       t: form.successTitle.trim(),
       m: form.successMessage.trim(),
     }
-        // Encode kept for reference but short links are used
-    encodeConfig(config)
+    // El token no viaja en la URL: /api/track usa META_TOKEN del servidor
+    const encoded = encodeURIComponent(encodeConfig({ ...config, k: '' }))
     setLinks({
-      go: `${origin}/go`,
-      success: `${origin}/success`,
+      go: `${origin}/go?c=${encoded}`,
+      success: `${origin}/success?c=${encoded}`,
     })
     setStep(4)
   }
