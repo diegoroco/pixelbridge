@@ -1,0 +1,39 @@
+<script>
+// Compra de Aida Qui en /activacion-v4/gracias: pixel del navegador + API de Conversiones por PixelBridge,
+// con el mismo eventID para que Meta no la cuente doble, y sin repetir si recargan la página.
+(function () {
+  var VALUE = 19, CURRENCY = 'EUR';
+  var SERVER_PIXELS = ['1942441866476662', '2327321628069315'];
+
+  function cookie(n) { var m = document.cookie.match(new RegExp('(?:^|; )' + n + '=([^;]*)')); return m ? decodeURIComponent(m[1]) : null; }
+
+  // Si Stripe redirige con ?session_id={CHECKOUT_SESSION_ID}, esa es la llave de la compra
+  var sessionId = new URLSearchParams(window.location.search).get('session_id');
+  var key = 'aq_purchase_' + (sessionId || 'sin_sesion');
+  try {
+    var prev = localStorage.getItem(key);
+    if (prev && (sessionId || Date.now() - Number(prev) < 30 * 60 * 1000)) return;
+    localStorage.setItem(key, String(Date.now()));
+  } catch (e) {}
+
+  var eventId = sessionId || ('purchase-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+  var utm = {
+    utm_source: cookie('utm_source') || '', utm_campaign: cookie('utm_campaign') || '',
+    utm_adset: cookie('utm_adset') || '', utm_ad: cookie('utm_ad') || '', utm_placement: cookie('utm_placement') || ''
+  };
+  var data = { value: VALUE, currency: CURRENCY };
+  for (var k in utm) data[k] = utm[k];
+
+  if (typeof fbq === 'function') fbq('track', 'Purchase', data, { eventID: eventId });
+
+  SERVER_PIXELS.forEach(function (id) {
+    fetch('https://pixelbridge-theta.vercel.app/api/track', {
+      method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pixelId: id, token: '', event: 'Purchase', eventId: eventId, value: VALUE, currency: CURRENCY,
+        eventSourceUrl: window.location.href, fbp: cookie('_fbp') || undefined, fbc: cookie('_fbc') || undefined, utm: utm
+      })
+    })['catch'](function () {});
+  });
+})();
+</script>
