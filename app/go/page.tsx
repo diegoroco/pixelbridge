@@ -59,6 +59,26 @@ async function sendServerEvent(pixelId: string, token: string, config: BridgeCon
   }
 }
 
+// Pasa las UTM del anuncio al link de Stripe para ver en Stripe de qué campaña vino cada venta.
+// Stripe solo guarda las 5 estándar: el conjunto y el anuncio van en utm_term y utm_content si no vienen.
+function stripeUrlWithUtm(stripeLink: string): string {
+  try {
+    const from = new URLSearchParams(window.location.search)
+    const url = new URL(stripeLink)
+    const utm: Record<string, string | null> = {
+      utm_source: from.get('utm_source'),
+      utm_medium: from.get('utm_medium'),
+      utm_campaign: from.get('utm_campaign'),
+      utm_content: from.get('utm_content') || from.get('utm_ad'),
+      utm_term: from.get('utm_term') || from.get('utm_adset'),
+    }
+    Object.entries(utm).forEach(([k, v]) => { if (v) url.searchParams.set(k, v) })
+    return url.toString()
+  } catch {
+    return stripeLink
+  }
+}
+
 function GoContent() {
   const params = useSearchParams()
 
@@ -72,7 +92,7 @@ function GoContent() {
     const eventId = crypto.randomUUID()
 
     if (!config.p) {
-      setTimeout(() => { window.location.href = config.s }, 200)
+      setTimeout(() => { window.location.href = stripeUrlWithUtm(config.s) }, 200)
       return
     }
 
@@ -85,7 +105,7 @@ function GoContent() {
 
     // Redirige cuando salieron los eventos (navegador y servidor), con un tope para no dejar esperando al cliente
     let done = false
-    const go = () => { if (!done) { done = true; window.location.href = config.s } }
+    const go = () => { if (!done) { done = true; window.location.href = stripeUrlWithUtm(config.s) } }
     Promise.all([server, waitForPixel(2000).then(() => new Promise(r => setTimeout(r, 300)))]).then(go)
     setTimeout(go, 2500)
   }, [params])
