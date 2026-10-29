@@ -3,7 +3,7 @@
 import { useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { decodeConfig, BridgeConfig } from '@/lib/config'
-import { initPixel, track, waitForPixel } from '@/lib/pixel'
+import { initPixel, track, waitForBrowserEvent } from '@/lib/pixel'
 import { pixelsFor } from '@/lib/linked'
 
 function getCookie(name: string): string | undefined {
@@ -25,6 +25,17 @@ function getConfigFromEnv(): BridgeConfig | null {
     t: process.env.NEXT_PUBLIC_SUCCESS_TITLE || '¡Gracias por tu compra!',
     m: process.env.NEXT_PUBLIC_SUCCESS_MESSAGE || '',
   }
+}
+
+// La página de origen manda su _fbp y _fbc (?fbp=&fbc=) para que el navegador siga siendo la misma persona para Meta
+function adoptFbCookies(params: URLSearchParams) {
+  const maxAge = 90 * 24 * 60 * 60
+  ;(['fbp', 'fbc'] as const).forEach(name => {
+    const value = params.get(name)
+    if (value && /^fb\.\d\.\d+\./.test(value) && !getCookie(`_${name}`)) {
+      document.cookie = `_${name}=${value}; max-age=${maxAge}; path=/; SameSite=Lax`
+    }
+  })
 }
 
 // fbc debe ir con formato fb.1.<ms>.<fbclid>; el fbclid suelto Meta lo marca como inválido
@@ -96,6 +107,7 @@ function GoContent() {
       return
     }
 
+    adoptFbCookies(new URLSearchParams(window.location.search))
     const pixels = pixelsFor(config.p, config.x)
     initPixel(pixels)
     // fbq('track') sale a todos los pixeles inicializados, con el mismo eventID que el servidor para deduplicar
@@ -106,8 +118,8 @@ function GoContent() {
     // Redirige cuando salieron los eventos (navegador y servidor), con un tope para no dejar esperando al cliente
     let done = false
     const go = () => { if (!done) { done = true; window.location.href = stripeUrlWithUtm(config.s) } }
-    Promise.all([server, waitForPixel(2000).then(() => new Promise(r => setTimeout(r, 300)))]).then(go)
-    setTimeout(go, 2500)
+    Promise.all([server, waitForBrowserEvent('InitiateCheckout', pixels, 2000)]).then(go)
+    setTimeout(go, 2000)
   }, [params])
 
   return (

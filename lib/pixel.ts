@@ -43,12 +43,16 @@ export function track(event: string, params?: Record<string, unknown>, eventId?:
   }
 }
 
-// Espera a que cargue fbevents.js (callMethod existe) para que el evento del navegador salga antes de redirigir
-export function waitForPixel(timeoutMs: number): Promise<void> {
+// Espera a que el navegador haya enviado el evento a cada pixel (fbevents primero carga la config de cada uno),
+// con un tope por si un bloqueador de anuncios lo impide
+export function waitForBrowserEvent(event: string, pixelIds: string[], timeoutMs: number): Promise<void> {
   return new Promise(resolve => {
     const start = Date.now()
     const check = () => {
-      if (window.fbq?.callMethod || Date.now() - start >= timeoutMs) resolve()
+      const hits = performance.getEntriesByType('resource').map(e => e.name).filter(n => n.includes('facebook.com/tr'))
+      const sent = pixelIds.every(id => hits.some(n => n.includes(`id=${id}`) && n.includes(`ev=${event}`)))
+      // Si fbevents mandó por POST la URL no trae id ni ev: basta con ver PageView + evento por cada pixel
+      if (sent || hits.length >= pixelIds.length * 2 || Date.now() - start >= timeoutMs) resolve()
       else setTimeout(check, 50)
     }
     check()
