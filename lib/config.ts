@@ -7,6 +7,7 @@ export interface BridgeConfig {
   c: string  // currency
   t: string  // successTitle
   m: string  // successMessage
+  x?: string[]  // pixeles extra
 }
 
 export function encodeConfig(config: BridgeConfig): string {
@@ -16,7 +17,7 @@ export function encodeConfig(config: BridgeConfig): string {
 
 export function decodeConfig(encoded: string): BridgeConfig | null {
   try {
-    return JSON.parse(decodeURIComponent(escape(atob(encoded))))
+    return JSON.parse(decodeURIComponent(escape(atob(encoded.replace(/ /g, '+')))))
   } catch {
     return null
   }

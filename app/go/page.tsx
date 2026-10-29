@@ -3,7 +3,8 @@
 import { useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { decodeConfig, BridgeConfig } from '@/lib/config'
-import { initPixel, track } from '@/lib/pixel'
+import { initPixel, track, waitForPixel } from '@/lib/pixel'
+import { pixelsFor } from '@/lib/linked'
 
 function getCookie(name: string): string | undefined {
   const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'))
@@ -26,18 +27,31 @@ function getConfigFromEnv(): BridgeConfig | null {
   }
 }
 
-async function sendServerEvent(config: BridgeConfig, event: string, eventId: string) {
+// fbc debe ir con formato fb.1.<ms>.<fbclid>; el fbclid suelto Meta lo marca como inválido
+function getFbc(): string | undefined {
+  const cookie = getCookie('_fbc')
+  if (cookie) return cookie
+  const fbclid = new URLSearchParams(window.location.search).get('fbclid')
+  return fbclid ? `fb.1.${Date.now()}.${fbclid}` : undefined
+}
+
+async function sendServerEvent(pixelId: string, token: string, config: BridgeConfig, event: string, eventId: string) {
   try {
+    // keepalive: la petición sigue aunque el navegador ya se fue a Stripe
     await fetch('/api/track', {
       method: 'POST',
+      keepalive: true,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        pixelId: config.p,
-        token: config.k,
+        pixelId,
+        token,
         event,
         eventId,
+        value: parseFloat(config.v) || 0,
+        currency: config.c || 'EUR',
+        eventSourceUrl: window.location.href,
         fbp: getCookie('_fbp'),
-        fbc: getCookie('_fbc') || new URLSearchParams(window.location.search).get('fbclid') || undefined,
+        fbc: getFbc(),
       }),
     })
   } catch {
@@ -57,16 +71,23 @@ function GoContent() {
 
     const eventId = crypto.randomUUID()
 
-    if (config.p) {
-      initPixel(config.p)
-      setTimeout(() => {
-        track('InitiateCheckout', undefined, eventId)
-        sendServerEvent(config, 'InitiateCheckout', eventId)
-        setTimeout(() => { window.location.href = config.s }, 400)
-      }, 200)
-    } else {
+    if (!config.p) {
       setTimeout(() => { window.location.href = config.s }, 200)
+      return
     }
+
+    const pixels = pixelsFor(config.p, config.x)
+    initPixel(pixels)
+    // fbq('track') sale a todos los pixeles inicializados, con el mismo eventID que el servidor para deduplicar
+    track('InitiateCheckout', { value: parseFloat(config.v) || 0, currency: config.c || 'EUR' }, eventId)
+    const server = Promise.all(pixels.map(id =>
+      sendServerEvent(id, id === config.p ? config.k : '', config, 'InitiateCheckout', eventId)))
+
+    // Redirige cuando salieron los eventos (navegador y servidor), con un tope para no dejar esperando al cliente
+    let done = false
+    const go = () => { if (!done) { done = true; window.location.href = config.s } }
+    Promise.all([server, waitForPixel(2000).then(() => new Promise(r => setTimeout(r, 300)))]).then(go)
+    setTimeout(go, 2500)
   }, [params])
 
   return (

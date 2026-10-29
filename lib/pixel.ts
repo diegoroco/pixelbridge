@@ -5,7 +5,7 @@ declare global {
   }
 }
 
-export function initPixel(pixelId: string): void {
+export function initPixel(pixelIds: string[]): void {
   if (typeof window === 'undefined') return
 
   if (!window.fbq) {
@@ -29,7 +29,7 @@ export function initPixel(pixelId: string): void {
     document.head.appendChild(script)
   }
 
-  window.fbq('init', pixelId)
+  pixelIds.forEach(id => window.fbq('init', id))
   window.fbq('track', 'PageView')
 }
 
@@ -41,4 +41,16 @@ export function track(event: string, params?: Record<string, unknown>, eventId?:
   } else {
     window.fbq('track', event, {}, options)
   }
+}
+
+// Espera a que cargue fbevents.js (callMethod existe) para que el evento del navegador salga antes de redirigir
+export function waitForPixel(timeoutMs: number): Promise<void> {
+  return new Promise(resolve => {
+    const start = Date.now()
+    const check = () => {
+      if (window.fbq?.callMethod || Date.now() - start >= timeoutMs) resolve()
+      else setTimeout(check, 50)
+    }
+    check()
+  })
 }

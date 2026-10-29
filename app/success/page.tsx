@@ -61,7 +61,7 @@ function SuccessContent() {
 
     if (resolved?.p) {
       const eventId = crypto.randomUUID()
-      initPixel(resolved.p)
+      initPixel([resolved.p])
       setTimeout(() => {
         track('Purchase', {
           value: parseFloat(resolved.v) || 0,
